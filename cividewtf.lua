@@ -13,8 +13,8 @@ Fluent.Notify = function() end -- Disable all Fluent notifications
 
 -- Create main window
 local Window = Fluent:CreateWindow({
-    Title = "PrismaticaX 1.5",
-    SubTitle = "By @zood3llotgk",
+    Title = "civide.wtf",
+    SubTitle = "By @han3t0_0",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
     Acrylic = false,
