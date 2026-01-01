@@ -31,11 +31,81 @@ local hue = 0
 ------------------------------------------------
 -- ESP (Highlight around enemy players)
 ------------------------------------------------
-loadstring(game:HttpGet("https://raw.githubusercontent.com/Stratxgy/Roblox-Chams-Highlight/refs/heads/main/Highlight.lua"))() -- load the script
-chams.enabled = true
-chams.teamcheck = true
-chams.fillcolor = Color3.fromRGB(0, 0, 255)
-chams.outlinecolor = Color3.fromRGB(255, 255, 0)
+-- Prison Life CHAMS с цветами по командам
+local Players = game:GetService("Players")
+local me = Players.LocalPlayer
+
+-- Цвета для команд
+local teamColors = {
+    Prisoners = Color3.fromRGB(255, 50, 50),   -- Красный
+    Police = Color3.fromRGB(50, 50, 255),      -- Синий
+    Criminals = Color3.fromRGB(50, 255, 50),   -- Зеленый
+    Innocents = Color3.fromRGB(255, 255, 50)   -- Желтый
+}
+
+-- Основная функция
+local function applyChams(player, character)
+    if player == me or not character then return end
+    
+    -- Убираем старый chams
+    local old = character:FindFirstChild("PL_Chams")
+    if old then old:Destroy() end
+    
+    -- Создаем новый
+    local chams = Instance.new("Highlight")
+    chams.Name = "PL_Chams"
+    chams.Adornee = character
+    chams.DepthMode = "AlwaysOnTop"
+    chams.FillTransparency = 0.4
+    chams.OutlineTransparency = 0
+    
+    -- Определяем цвет
+    if player.Team then
+        local color = teamColors[player.Team.Name] or Color3.fromRGB(255, 0, 0)
+        chams.FillColor = color
+        chams.OutlineColor = Color3.new(color.R + 0.3, color.G + 0.3, color.B + 0.3)
+    else
+        chams.FillColor = Color3.fromRGB(255, 0, 0)
+        chams.OutlineColor = Color3.fromRGB(255, 255, 255)
+    end
+    
+    -- Проверка команды (не показываем свою команду)
+    if me.Team and player.Team then
+        chams.Enabled = me.Team ~= player.Team
+    else
+        chams.Enabled = true
+    end
+    
+    chams.Parent = character
+end
+
+-- Настраиваем всех игроков
+for _, player in pairs(Players:GetPlayers()) do
+    if player.Character then
+        applyChams(player, player.Character)
+    end
+    
+    player.CharacterAdded:Connect(function(char)
+        task.wait(0.1)
+        applyChams(player, char)
+    end)
+end
+
+-- Новые игроки
+Players.PlayerAdded:Connect(function(player)
+    if player.Character then
+        applyChams(player, player.Character)
+    end
+    player.CharacterAdded:Connect(function(char)
+        task.wait(0.1)
+        applyChams(player, char)
+    end)
+end)
+
+print("🎮 Prison Life CHAMS активирован!")
+if me.Team then
+    print("Ваша команда: " .. me.Team.Name)
+end
  
 ------------------------------------------------
 -- FOV RING (Drawing API circle)
