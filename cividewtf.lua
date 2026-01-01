@@ -242,21 +242,6 @@ end)
 
 print("✅ FOV круг активирован!")
  
-	-- update hue for rainbow fade
-	hue = (hue + 0.001) % 1
-	circle.Color = HSVtoRGB(hue,1,1)
- 
-	-- also update ESP outline color for all players
-	for _, plr in pairs(game.Players:GetPlayers()) do
-		if plr.Character then
-			local highlight = plr.Character:FindFirstChild("ESP_Highlight")
-			if highlight then
-				highlight.OutlineColor = HSVtoRGB(hue,1,1)
-			end
-		end
-	end
-end)
- 
 ------------------------------------------------
 -- AIMLOCK
 ------------------------------------------------
