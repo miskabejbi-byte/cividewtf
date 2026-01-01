@@ -31,8 +31,9 @@ local hue = 0
 ------------------------------------------------
 -- ESP (Highlight around enemy players)
 ------------------------------------------------
--- Prison Life CHAMS с цветами по командам
+-- Prison Life CHAMS PRO
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local me = Players.LocalPlayer
 
 -- Цвета для команд
@@ -40,14 +41,15 @@ local teamColors = {
     Prisoners = Color3.fromRGB(255, 50, 50),   -- Красный
     Guards = Color3.fromRGB(50, 50, 255),      -- Синий
     Criminals = Color3.fromRGB(50, 255, 50),   -- Зеленый
-    Innocents = Color3.fromRGB(255, 255, 50)   -- Желтый
+    Innocents = Color3.fromRGB(255, 255, 50),  -- Желтый
+    Neutral = Color3.fromRGB(255, 165, 0)      -- Оранжевый (для нейтральных)
 }
 
 -- Основная функция
 local function applyChams(player, character)
     if player == me or not character then return end
     
-    -- Убираем старый chams
+    -- Удаляем старый если есть
     local old = character:FindFirstChild("PL_Chams")
     if old then old:Destroy() end
     
@@ -56,20 +58,21 @@ local function applyChams(player, character)
     chams.Name = "PL_Chams"
     chams.Adornee = character
     chams.DepthMode = "AlwaysOnTop"
-    chams.FillTransparency = 0.4
+    chams.FillTransparency = 0.3
     chams.OutlineTransparency = 0
     
     -- Определяем цвет
-    if player.Team then
-        local color = teamColors[player.Team.Name] or Color3.fromRGB(255, 0, 0)
-        chams.FillColor = color
-        chams.OutlineColor = Color3.new(color.R + 0.3, color.G + 0.3, color.B + 0.3)
-    else
-        chams.FillColor = Color3.fromRGB(255, 0, 0)
-        chams.OutlineColor = Color3.fromRGB(255, 255, 255)
-    end
+    local teamName = player.Team and player.Team.Name or "Neutral"
+    local color = teamColors[teamName] or teamColors.Neutral
     
-    -- Проверка команды (не показываем свою команду)
+    chams.FillColor = color
+    chams.OutlineColor = Color3.new(
+        math.clamp(color.R + 0.2, 0, 1),
+        math.clamp(color.G + 0.2, 0, 1),
+        math.clamp(color.B + 0.2, 0, 1)
+    )
+    
+    -- Включаем/выключаем в зависимости от команды
     if me.Team and player.Team then
         chams.Enabled = me.Team ~= player.Team
     else
@@ -79,32 +82,73 @@ local function applyChams(player, character)
     chams.Parent = character
 end
 
--- Настраиваем всех игроков
-for _, player in pairs(Players:GetPlayers()) do
-    if player.Character then
-        applyChams(player, player.Character)
+-- Функция для полной настройки игрока
+local function setupPlayer(player)
+    if player == me then return end
+    
+    -- Обработчик появления персонажа
+    local function onCharacterAdded(character)
+        task.wait(0.15) -- Небольшая задержка для загрузки
+        applyChams(player, character)
     end
     
-    player.CharacterAdded:Connect(function(char)
+    -- Обработчик смены команды
+    local function onTeamChanged()
         task.wait(0.1)
-        applyChams(player, char)
+        if player.Character then
+            applyChams(player, player.Character)
+        end
+    end
+    
+    -- Настройка отслеживания
+    player:GetPropertyChangedSignal("Team"):Connect(onTeamChanged)
+    
+    if player.Character then
+        onCharacterAdded(player.Character)
+    end
+    player.CharacterAdded:Connect(onCharacterAdded)
+    
+    -- Автоочистка при удалении персонажа
+    player.CharacterRemoving:Connect(function(char)
+        local chams = char:FindFirstChild("PL_Chams")
+        if chams then
+            chams:Destroy()
+        end
     end)
 end
 
--- Новые игроки
-Players.PlayerAdded:Connect(function(player)
-    if player.Character then
-        applyChams(player, player.Character)
-    end
-    player.CharacterAdded:Connect(function(char)
-        task.wait(0.1)
-        applyChams(player, char)
-    end)
-end)
+-- Инициализация всех игроков
+for _, player in pairs(Players:GetPlayers()) do
+    setupPlayer(player)
+end
 
-print("🎮 Prison Life CHAMS активирован!")
+-- Новые игроки
+Players.PlayerAdded:Connect(setupPlayer)
+
+-- Обновление при смене своей команды
+if me then
+    me:GetPropertyChangedSignal("Team"):Connect(function()
+        task.wait(0.2)
+        -- Обновляем всех игроков
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= me and player.Character then
+                applyChams(player, player.Character)
+            end
+        end
+    end)
+end
+
+-- Информация
+print("========================================")
+print("🎮 Prison Life CHAMS PRO")
+print("✅ Автоматическое обновление новых игроков")
+print("✅ Динамическая смена цветов")
+print("========================================")
+
 if me.Team then
     print("Ваша команда: " .. me.Team.Name)
+    local color = teamColors[me.Team.Name] or teamColors.Neutral
+    print("Цвет вашей команды: " .. tostring(color))
 end
  
 ------------------------------------------------
