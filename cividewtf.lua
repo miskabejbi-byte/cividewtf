@@ -74,12 +74,48 @@ end)
 -- AIMLOCK
 ------------------------------------------------
 function AimLock()
+	local player = game.Players.LocalPlayer
 	local target
 	local lastMagnitude = math.huge
+	
 	for _, v in pairs(game.Players:GetPlayers()) do
+		-- Проверяем, чтобы это был не игрок и персонаж существовал
 		if v ~= player and v.Character and v.Character.PrimaryPart then
+			-- Получаем команды игроков
+			local playerTeam = player.Team
+			local targetTeam = v.Team
+			
+			-- Проверка команды: пропускаем игроков из своей команды
+			if playerTeam and targetTeam and playerTeam == targetTeam then
+				continue
+			end
+			
+			-- В Prison Life также можно проверить по названию команды
+			local teamName = targetTeam and targetTeam.Name or ""
+			
+			-- Дополнительная проверка: не целиться в заключенных, если сам заключенный
+			-- Или не целиться в полицию, если сам полицейский
+			if (teamName == "Prisoners" and playerTeam and playerTeam.Name == "Prisoners") then
+				continue
+			end
+			
+			if (teamName == "Police" and playerTeam and playerTeam.Name == "Police") then
+				continue
+			end
+			
+			if (teamName == "Criminals" and playerTeam and playerTeam.Name == "Criminals") then
+				continue
+			end
+			
+			-- Проверка на убитого игрока (если в игре есть эта функция)
+			if v.Character:FindFirstChild("KO") and v.Character.KO.Value then
+				continue
+			end
+			
+			-- Оригинальная логика прицеливания
 			local charPos = v.Character.PrimaryPart.Position
 			local screenPos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(charPos)
+			
 			if onScreen then
 				local dist = (Vector2.new(screenPos.X, screenPos.Y) - circle.Position).Magnitude
 				if dist < circle.Radius and dist < lastMagnitude then
