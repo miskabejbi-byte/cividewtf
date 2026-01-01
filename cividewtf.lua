@@ -79,22 +79,22 @@ function AimLock()
 	local lastMagnitude = math.huge
 	
 	for _, v in pairs(game.Players:GetPlayers()) do
-		-- Проверяем, чтобы это был не игрок и персонаж существовал
+		
 		if v ~= player and v.Character and v.Character.PrimaryPart then
-			-- Получаем команды игроков
+		
 			local playerTeam = player.Team
 			local targetTeam = v.Team
 			
-			-- Проверка команды: пропускаем игроков из своей команды
+			
 			if playerTeam and targetTeam and playerTeam == targetTeam then
 				continue
 			end
 			
-			-- В Prison Life также можно проверить по названию команды
+
 			local teamName = targetTeam and targetTeam.Name or ""
 			
-			-- Дополнительная проверка: не целиться в заключенных, если сам заключенный
-			-- Или не целиться в полицию, если сам полицейский
+	
+	
 			if (teamName == "Prisoners" and playerTeam and playerTeam.Name == "Prisoners") then
 				continue
 			end
@@ -107,12 +107,12 @@ function AimLock()
 				continue
 			end
 			
-			-- Проверка на убитого игрока (если в игре есть эта функция)
+		
 			if v.Character:FindFirstChild("KO") and v.Character.KO.Value then
 				continue
 			end
 			
-			-- Оригинальная логика прицеливания
+			
 			local charPos = v.Character.PrimaryPart.Position
 			local screenPos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(charPos)
 			
