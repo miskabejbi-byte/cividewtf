@@ -154,20 +154,93 @@ end
 ------------------------------------------------
 -- FOV RING (Drawing API circle)
 ------------------------------------------------
+-- Получаем локального игрока
+local Players = game:GetService("Players")
+local localPlayer = Players.LocalPlayer
+
+-- Настройки FOV
 local FOV = 300
 local circle = Drawing.new("Circle")
 circle.Thickness = 2
 circle.NumSides = 64
 circle.Radius = FOV
 circle.Filled = false
-circle.Color = HSVtoRGB(hue,1,1) -- initial rainbow color
 circle.Transparency = 1
 circle.Visible = true
- 
+
+-- Функция HSV to RGB (если ее нет)
+local function HSVtoRGB(h, s, v)
+    local r, g, b
+    
+    local i = math.floor(h * 6)
+    local f = h * 6 - i
+    local p = v * (1 - s)
+    local q = v * (1 - f * s)
+    local t = v * (1 - (1 - f) * s)
+    
+    i = i % 6
+    
+    if i == 0 then r, g, b = v, t, p
+    elseif i == 1 then r, g, b = q, v, p
+    elseif i == 2 then r, g, b = p, v, t
+    elseif i == 3 then r, g, b = p, q, v
+    elseif i == 4 then r, g, b = t, p, v
+    elseif i == 5 then r, g, b = v, p, q
+    end
+    
+    return Color3.new(r, g, b)
+end
+
+-- Цвета для команд в HSV формате
+local teamHSVColors = {
+    Prisoners = {0.08, 1, 1},   -- Оранжевый (H=30°)
+    Guards = {0.58, 1, 1},      -- Синий (H=210°)
+    Criminals = {0.33, 1, 1},   -- Зеленый (H=120°)
+    Innocents = {0.16, 1, 1},   -- Желтый (H=60°)
+    Default = {0, 1, 1}         -- Красный (по умолчанию)
+}
+
+-- Функция для обновления цвета FOV
+local function updateFOVColor()
+    if localPlayer and localPlayer.Team then
+        local teamName = localPlayer.Team.Name
+        local hsv = teamHSVColors[teamName] or teamHSVColors.Default
+        
+        -- Конвертируем HSV в RGB
+        circle.Color = HSVtoRGB(hsv[1], hsv[2], hsv[3])
+        
+        -- Выводим информацию
+        print("🎯 FOV цвет обновлен: " .. teamName)
+    else
+        -- Если нет команды - стандартный цвет
+        circle.Color = HSVtoRGB(0, 1, 1) -- Красный
+    end
+end
+
+-- Функция для позиционирования круга
+local function updateCirclePosition()
+    local mouse = game:GetService("Players").LocalPlayer:GetMouse()
+    circle.Position = Vector2.new(mouse.X, mouse.Y + 36)
+end
+
+-- Обновляем цвет при смене команды
+if localPlayer then
+    localPlayer:GetPropertyChangedSignal("Team"):Connect(function()
+        task.wait(0.1)
+        updateFOVColor()
+    end)
+end
+
+-- Инициализируем цвет
+task.wait(1)
+updateFOVColor()
+
+-- Обновляем позицию круга
 game:GetService("RunService").RenderStepped:Connect(function()
-	local cam = workspace.CurrentCamera
-	local viewport = cam.ViewportSize
-	circle.Position = Vector2.new(viewport.X/2, viewport.Y/2)
+    updateCirclePosition()
+end)
+
+print("✅ FOV круг активирован!")
  
 	-- update hue for rainbow fade
 	hue = (hue + 0.001) % 1
