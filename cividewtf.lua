@@ -38,7 +38,7 @@ local me = Players.LocalPlayer
 -- Цвета для команд
 local teamColors = {
     Prisoners = Color3.fromRGB(255, 50, 50),   -- Красный
-    Police = Color3.fromRGB(50, 50, 255),      -- Синий
+    Guards = Color3.fromRGB(50, 50, 255),      -- Синий
     Criminals = Color3.fromRGB(50, 255, 50),   -- Зеленый
     Innocents = Color3.fromRGB(255, 255, 50)   -- Желтый
 }
