@@ -154,9 +154,7 @@ end
 ------------------------------------------------
 -- FOV RING (Drawing API circle)
 ------------------------------------------------
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local localPlayer = Players.LocalPlayer
+local player = game.Players.LocalPlayer
 
 local FOV = 300
 local circle = Drawing.new("Circle")
@@ -167,98 +165,36 @@ circle.Filled = false
 circle.Transparency = 1
 circle.Visible = true
 
--- Функция HSV to RGB
-local function HSVtoRGB(h, s, v)
-    local r, g, b
-    
-    local i = math.floor(h * 6)
-    local f = h * 6 - i
-    local p = v * (1 - s)
-    local q = v * (1 - f * s)
-    local t = v * (1 - (1 - f) * s)
-    
-    i = i % 6
-    
-    if i == 0 then r, g, b = v, t, p
-    elseif i == 1 then r, g, b = q, v, p
-    elseif i == 2 then r, g, b = p, v, t
-    elseif i == 3 then r, g, b = p, q, v
-    elseif i == 4 then r, g, b = t, p, v
-    elseif i == 5 then r, g, b = v, p, q
-    end
-    
-    return Color3.new(r, g, b)
-end
-
--- Цвета команд
-local teamHues = {
-    Prisoners = 0.08,   -- Оранжевый
-    Guards = 0.58,      -- Синий
-    Criminals = 0.33,   -- Зеленый
-    Innocents = 0.16,   -- Желтый
-    Default = 0         -- Красный
-}
-
--- Текущий и целевой hue
-local currentHue = 0
-local targetHue = 0
-
--- Функция обновления целевого hue
-local function updateTargetHue()
-    if localPlayer and localPlayer.Team then
-        local teamName = localPlayer.Team.Name
-        targetHue = teamHues[teamName] or teamHues.Default
-    else
-        targetHue = teamHues.Default
-    end
-end
-
--- Инициализация
-updateTargetHue()
-currentHue = targetHue
-
--- Плавный переход цветов
-RunService.RenderStepped:Connect(function(deltaTime)
-    local cam = workspace.CurrentCamera
-    local viewport = cam.ViewportSize
-    circle.Position = Vector2.new(viewport.X/2, viewport.Y/2)
-    
-    -- Плавное изменение hue к целевому
-    local lerpSpeed = 0.05
-    local diff = targetHue - currentHue
-    
-    -- Корректируем разницу для плавного перехода через 0
-    if diff > 0.5 then
-        diff = diff - 1
-    elseif diff < -0.5 then
-        diff = diff + 1
-    end
-    
-    currentHue = (currentHue + diff * lerpSpeed) % 1
-    
-    -- Устанавливаем цвет круга
-    circle.Color = HSVtoRGB(currentHue, 1, 1)
-    
-    -- Обновляем ESP цвет
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr.Character then
-            local highlight = plr.Character:FindFirstChild("ESP_Highlight")
-            if highlight then
-                highlight.OutlineColor = HSVtoRGB(currentHue, 1, 1)
-            end
+-- Цвет по команде
+local function updateColor()
+    if player.Team then
+        if player.Team.Name == "Prisoners" then
+            circle.Color = Color3.new(1, 0.65, 0) -- Оранжевый
+        elseif player.Team.Name == "Guards" then
+            circle.Color = Color3.new(0, 0.4, 1) -- Синий
+        elseif player.Team.Name == "Criminals" then
+            circle.Color = Color3.new(0, 1, 0) -- Зеленый
+        else
+            circle.Color = Color3.new(1, 0, 0) -- Красный
         end
+    else
+        circle.Color = Color3.new(1, 0, 0) -- Красный
     end
+end
+
+-- Обновляем позицию и цвет
+game:GetService("RunService").RenderStepped:Connect(function()
+    local cam = workspace.CurrentCamera
+    circle.Position = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
+    updateColor()
 end)
 
--- Обновляем при смене команды
-if localPlayer then
-    localPlayer:GetPropertyChangedSignal("Team"):Connect(function()
-        task.wait(0.1)
-        updateTargetHue()
-    end)
-end
+-- При смене команды
+player:GetPropertyChangedSignal("Team"):Connect(updateColor)
 
-print("🎯 FOV с динамическим цветом команды!")
+-- Инициализация
+updateColor()
+print("FOV цвет установлен по команде")
  
 ------------------------------------------------
 -- AIMLOCK
