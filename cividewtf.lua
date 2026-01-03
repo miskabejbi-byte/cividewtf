@@ -1,4 +1,5 @@
 -- civividewtf By hanetloveintim
+-- Fixed by Highlight AI
 -- Prison Life Script with Rayfield UI
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -6,7 +7,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
    Name = "civividewtf By hanetloveintim",
    LoadingTitle = "Prison Life Script",
-   LoadingSubtitle = "by hanetloveintim",
+   LoadingSubtitle = "by miskabejbu",
    ConfigurationSaving = {
       Enabled = false,
       FolderName = nil,
@@ -26,21 +27,36 @@ local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
+-- Shared Variables
 local AimlockEnabled = false
-local AimlockAlwaysOn = false
-local ArrestAuraEnabled = false
+local AimlockActive = false
 local TeamCheckEnabled = true
+local WallCheckEnabled = true
+local DiedCheckEnabled = true
+local ForceFieldCheckEnabled = true
+
+local FovEnabled = false
+local FovSize = 100
+local AimPart = "Head"
+local PredictionAmount = 0.1
+local SmoothnessAmount = 0.5
+local AimMode = "Hold"
+local AimKey = Enum.KeyCode.E
+local UseRightClick = true 
+
+local BhopEnabled = false
+local BhopSpeed = 20
+local InfJumpEnabled = false
+local InfiniteStaminaEnabled = false
+local ArrestAuraEnabled = false
+local ArrestAuraDistance = 15
 local ChamsEnabled = false
 local NameEspEnabled = false
 local TracersEnabled = false
-local FovEnabled = false
-local InfJumpEnabled = false
 local StretchEnabled = false
-local FovSize = 100
 local StretchValue = 1
-local RightMouseDown = false
-local ArrestAuraDistance = 15
 
+-- Drawing FOV Circle
 local FovCircle = Drawing.new("Circle")
 FovCircle.Thickness = 2
 FovCircle.NumSides = 50
@@ -53,6 +69,7 @@ FovCircle.Transparency = 1
 local CurrentTarget = nil
 local EspObjects = {}
 
+-- Functions
 local function GetPlayerTeam(player)
     if not player.Character then return nil end
     if player.Team then return player.Team.Name end
@@ -92,15 +109,46 @@ local function IsEnemy(player)
     return myTeam ~= theirTeam
 end
 
-local function GetClosestPlayerToCursor()
+local function IsValidTarget(player)
+    if not player.Character then return false end
+    if DiedCheckEnabled then
+        local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid and humanoid.Health <= 0 then return false end
+    end
+    if ForceFieldCheckEnabled then
+        if player.Character:FindFirstChildOfClass("ForceField") then return false end
+    end
+    return true
+end
+
+local function GetTargetPart(character)
+    if AimPart == "Head" then
+        return character:FindFirstChild("Head")
+    else
+        return character:FindFirstChild("Torso") or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso")
+    end
+end
+
+local function CheckWall(targetPart)
+    if not WallCheckEnabled then return true end
+    local origin = Camera.CFrame.Position
+    local direction = targetPart.Position - origin
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, targetPart.Parent}
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    local rayResult = workspace:Raycast(origin, direction, raycastParams)
+    return rayResult == nil
+end
+
+local function GetClosestPlayerToCursor(maxDist)
     local closestPlayer = nil
-    local shortestDistance = FovSize
+    local shortestDistance = maxDist
     for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
-            if IsEnemy(player) then
-                local head = player.Character.Head
-                local screenPoint, onScreen = Camera:WorldToViewportPoint(head.Position)
-                if onScreen then
+        if player ~= LocalPlayer and player.Character and IsValidTarget(player) then
+            local part = GetTargetPart(player.Character)
+            if part and IsEnemy(player) then
+                local screenPoint, onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen and CheckWall(part) then
                     local mousePos = UserInputService:GetMouseLocation()
                     local distance = (Vector2.new(screenPoint.X, screenPoint.Y) - mousePos).Magnitude
                     if distance < shortestDistance then
@@ -114,30 +162,7 @@ local function GetClosestPlayerToCursor()
     return closestPlayer
 end
 
-local function ArrestAura()
-    if not ArrestAuraEnabled then return end
-    local myTeam = GetPlayerTeam(LocalPlayer)
-    if myTeam ~= "Guards" and myTeam ~= "Guard" and myTeam ~= "Bright blue" then return end
-    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
-    local myPos = LocalPlayer.Character.HumanoidRootPart.Position
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            local theirTeam = GetPlayerTeam(player)
-            if theirTeam == "Criminals" or theirTeam == "Criminal" or theirTeam == "Bright orange" then
-                local theirHRP = player.Character:FindFirstChild("HumanoidRootPart")
-                if theirHRP then
-                    local distance = (myPos - theirHRP.Position).Magnitude
-                    if distance <= ArrestAuraDistance then
-                        pcall(function()
-                            workspace.Remote.arrest:InvokeServer(player.Character)
-                        end)
-                    end
-                end
-            end
-        end
-    end
-end
-
+-- ESP Functions
 local function CreateChams(character, player)
     local highlight = Instance.new("Highlight")
     highlight.Parent = character
@@ -145,25 +170,21 @@ local function CreateChams(character, player)
     highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
     highlight.FillTransparency = 0.5
     highlight.OutlineTransparency = 0
-    highlight.Enabled = true
     table.insert(EspObjects, highlight)
 end
 
 local function CreateNameEsp(character, player)
     local head = character:FindFirstChild("Head")
     if not head then return end
-    local billboard = Instance.new("BillboardGui")
-    billboard.Parent = head
+    local billboard = Instance.new("BillboardGui", head)
     billboard.AlwaysOnTop = true
     billboard.Size = UDim2.new(0, 100, 0, 50)
     billboard.StudsOffset = Vector3.new(0, 2, 0)
-    local textLabel = Instance.new("TextLabel")
-    textLabel.Parent = billboard
+    local textLabel = Instance.new("TextLabel", billboard)
     textLabel.Size = UDim2.new(1, 0, 1, 0)
     textLabel.BackgroundTransparency = 1
     textLabel.Text = player.Name
     textLabel.TextColor3 = GetPlayerColor(player)
-    textLabel.TextStrokeTransparency = 0
     textLabel.Font = Enum.Font.SourceSansBold
     textLabel.TextSize = 14
     table.insert(EspObjects, billboard)
@@ -174,21 +195,14 @@ local function CreateTracers(character, player)
     if not hrp then return end
     local line = Drawing.new("Line")
     line.Visible = true
-    line.Color = GetPlayerColor(player)
     line.Thickness = 2
-    line.Transparency = 1
     table.insert(EspObjects, {Type = "Tracer", Line = line, Character = character, Player = player})
 end
 
 local function ClearEsp()
     for _, obj in pairs(EspObjects) do
-        if obj then
-            if typeof(obj) == "table" and obj.Type == "Tracer" then
-                if obj.Line then obj.Line:Remove() end
-            elseif typeof(obj) == "Instance" then
-                obj:Destroy()
-            end
-        end
+        if typeof(obj) == "Instance" then obj:Destroy()
+        elseif typeof(obj) == "table" and obj.Line then obj.Line:Remove() end
     end
     EspObjects = {}
 end
@@ -207,43 +221,42 @@ end
 local function UpdateTracers()
     for _, obj in pairs(EspObjects) do
         if typeof(obj) == "table" and obj.Type == "Tracer" then
-            local character = obj.Character
-            local line = obj.Line
-            local player = obj.Player
-            if character and character:FindFirstChild("HumanoidRootPart") then
-                local hrp = character.HumanoidRootPart
+            local hrp = obj.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
                 local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
                 if onScreen then
-                    local screenSize = Camera.ViewportSize
-                    line.From = Vector2.new(screenSize.X / 2, screenSize.Y)
-                    line.To = Vector2.new(screenPos.X, screenPos.Y)
-                    line.Color = GetPlayerColor(player)
-                    line.Visible = true
-                else
-                    line.Visible = false
-                end
-            else
-                line.Visible = false
-            end
+                    obj.Line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                    obj.Line.To = Vector2.new(screenPos.X, screenPos.Y)
+                    obj.Line.Color = GetPlayerColor(obj.Player)
+                    obj.Line.Visible = true
+                else obj.Line.Visible = false end
+            else obj.Line.Visible = false end
         end
     end
 end
 
+-- Tabs
 local CombatTab = Window:CreateTab("Combat", 4483362458)
 local VisualsTab = Window:CreateTab("Visuals", 4483362458)
 local MovementTab = Window:CreateTab("Movement", 4483362458)
 local MiscTab = Window:CreateTab("Misc", 4483362458)
 
-CombatTab:CreateSection("Aimlock")
-CombatTab:CreateToggle({Name = "Aimlock (Hold Right Mouse)", CurrentValue = false, Flag = "AimlockToggle", Callback = function(Value) AimlockEnabled = Value end})
-CombatTab:CreateToggle({Name = "Aimlock Always On (Mobile)", CurrentValue = false, Flag = "AimlockAlwaysOnToggle", Callback = function(Value) AimlockAlwaysOn = Value end})
-CombatTab:CreateToggle({Name = "Team Check", CurrentValue = true, Flag = "TeamCheckToggle", Callback = function(Value) TeamCheckEnabled = Value end})
+CombatTab:CreateSection("Aimlock Settings")
+CombatTab:CreateToggle({Name = "Enable Aimlock", CurrentValue = false, Flag = "AimlockToggle", Callback = function(Value) AimlockEnabled = Value AimlockActive = false end})
+CombatTab:CreateToggle({Name = "Use Right Click", CurrentValue = true, Flag = "RightClickToggle", Callback = function(Value) UseRightClick = Value end})
+CombatTab:CreateDropdown({Name = "Aim Mode", Options = {"Hold", "Toggle"}, CurrentOption = "Hold", Flag = "AimModeDropdown", Callback = function(Value) AimMode = Value AimlockActive = false end})
+CombatTab:CreateKeybind({Name = "Aim Key", CurrentKeybind = "E", HoldToInteract = false, Flag = "AimKeybind", Callback = function(Key) AimKey = Key end})
+CombatTab:CreateDropdown({Name = "Aim Part", Options = {"Head", "Torso"}, CurrentOption = "Head", Flag = "AimPartDropdown", Callback = function(Value) AimPart = Value end})
+CombatTab:CreateSlider({Name = "Prediction", Range = {0, 1}, Increment = 0.01, Suffix = "", CurrentValue = 0.1, Flag = "PredictionSlider", Callback = function(Value) PredictionAmount = Value end})
+CombatTab:CreateSlider({Name = "Smoothness", Range = {0, 1}, Increment = 0.01, Suffix = "", CurrentValue = 0.5, Flag = "SmoothnessSlider", Callback = function(Value) SmoothnessAmount = Value end})
 CombatTab:CreateToggle({Name = "Show FOV Circle", CurrentValue = false, Flag = "FovToggle", Callback = function(Value) FovEnabled = Value FovCircle.Visible = Value end})
-CombatTab:CreateSlider({Name = "FOV Size", Range = {50, 500}, Increment = 10, Suffix = "px", CurrentValue = 100, Flag = "FovSlider", Callback = function(Value) FovSize = Value FovCircle.Radius = Value end})
+CombatTab:CreateSlider({Name = "FOV Size", Range = {50, 800}, Increment = 10, Suffix = "px", CurrentValue = 100, Flag = "FovSlider", Callback = function(Value) FovSize = Value FovCircle.Radius = Value end})
 
-CombatTab:CreateSection("Arrest Aura")
-CombatTab:CreateToggle({Name = "Arrest Aura (Guard Only)", CurrentValue = false, Flag = "ArrestAuraToggle", Callback = function(Value) ArrestAuraEnabled = Value end})
-CombatTab:CreateSlider({Name = "Arrest Distance", Range = {5, 30}, Increment = 1, Suffix = " studs", CurrentValue = 15, Flag = "ArrestDistanceSlider", Callback = function(Value) ArrestAuraDistance = Value end})
+CombatTab:CreateSection("Checks")
+CombatTab:CreateToggle({Name = "Team Check", CurrentValue = true, Flag = "TeamCheckToggle", Callback = function(Value) TeamCheckEnabled = Value end})
+CombatTab:CreateToggle({Name = "Wall Check", CurrentValue = true, Flag = "WallCheckToggle", Callback = function(Value) WallCheckEnabled = Value end})
+CombatTab:CreateToggle({Name = "Died Check", CurrentValue = true, Flag = "DiedCheckToggle", Callback = function(Value) DiedCheckEnabled = Value end})
+CombatTab:CreateToggle({Name = "ForceField Check", CurrentValue = true, Flag = "FFCheckToggle", Callback = function(Value) ForceFieldCheckEnabled = Value end})
 
 VisualsTab:CreateSection("ESP")
 VisualsTab:CreateToggle({Name = "Chams", CurrentValue = false, Flag = "ChamsToggle", Callback = function(Value) ChamsEnabled = Value UpdateEsp() end})
@@ -251,62 +264,95 @@ VisualsTab:CreateToggle({Name = "Name ESP", CurrentValue = false, Flag = "NameEs
 VisualsTab:CreateToggle({Name = "Tracers", CurrentValue = false, Flag = "TracersToggle", Callback = function(Value) TracersEnabled = Value UpdateEsp() end})
 
 MovementTab:CreateSection("Movement")
+MovementTab:CreateToggle({Name = "Infinite Stamina (No Jump Drain)", CurrentValue = false, Flag = "StaminaToggle", Callback = function(Value) InfiniteStaminaEnabled = Value end})
+MovementTab:CreateToggle({Name = "Bhop (Jump Acceleration)", CurrentValue = false, Flag = "BhopToggle", Callback = function(Value) BhopEnabled = Value end})
+MovementTab:CreateSlider({Name = "Bhop Power", Range = {1, 100}, Increment = 1, Suffix = "", CurrentValue = 20, Flag = "BhopSlider", Callback = function(Value) BhopSpeed = Value end})
 MovementTab:CreateToggle({Name = "Infinite Jump", CurrentValue = false, Flag = "InfJumpToggle", Callback = function(Value) InfJumpEnabled = Value end})
 
 MiscTab:CreateSection("Misc")
 MiscTab:CreateToggle({Name = "Stretch Resolution", CurrentValue = false, Flag = "StretchToggle", Callback = function(Value) StretchEnabled = Value if Value then Camera.FieldOfView = 120 else Camera.FieldOfView = 70 end end})
 MiscTab:CreateSlider({Name = "Stretch Amount", Range = {1, 3}, Increment = 0.1, Suffix = "x", CurrentValue = 1, Flag = "StretchSlider", Callback = function(Value) StretchValue = Value if StretchEnabled then Camera.FieldOfView = 70 * Value end end})
 
-UserInputService.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton2 then RightMouseDown = true end end)
-UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton2 then RightMouseDown = false end end)
-
-RunService.RenderStepped:Connect(function()
-    if AimlockEnabled and (RightMouseDown or AimlockAlwaysOn) then
-        CurrentTarget = GetClosestPlayerToCursor()
-        if CurrentTarget and CurrentTarget.Character and CurrentTarget.Character:FindFirstChild("Head") then
-            local head = CurrentTarget.Character.Head
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
-        end
+-- Input Logic
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    local isAimKey = (UseRightClick and input.UserInputType == Enum.UserInputType.MouseButton2) or (not UseRightClick and input.KeyCode == AimKey)
+    if isAimKey and AimlockEnabled then
+        if AimMode == "Toggle" then AimlockActive = not AimlockActive else AimlockActive = true end
     end
-    if FovEnabled then
-        local mousePos = UserInputService:GetMouseLocation()
-        FovCircle.Position = mousePos
-        FovCircle.Color = GetMyTeamColor()
-        FovCircle.Visible = true
-    else
-        FovCircle.Visible = false
-    end
-    if StretchEnabled then Camera.FieldOfView = 70 * StretchValue end
-    if TracersEnabled then UpdateTracers() end
-    ArrestAura()
 end)
 
-UserInputService.JumpRequest:Connect(function()
-    if InfJumpEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+UserInputService.InputEnded:Connect(function(input)
+    local isAimKey = (UseRightClick and input.UserInputType == Enum.UserInputType.MouseButton2) or (not UseRightClick and input.KeyCode == AimKey)
+    if isAimKey and AimMode == "Hold" then AimlockActive = false end
+end)
+
+-- Main Loop
+RunService.RenderStepped:Connect(function()
+    -- Aimlock Logic
+    if AimlockEnabled and AimlockActive then
+        CurrentTarget = GetClosestPlayerToCursor(FovSize)
+        if CurrentTarget and CurrentTarget.Character then
+            local part = GetTargetPart(CurrentTarget.Character)
+            if part then
+                local targetPos = part.Position
+                local hrp = CurrentTarget.Character:FindFirstChild("HumanoidRootPart")
+                if hrp and PredictionAmount > 0 then
+                    targetPos = targetPos + (hrp.AssemblyLinearVelocity * PredictionAmount)
+                end
+                
+                local targetRotation = CFrame.lookAt(Camera.CFrame.Position, targetPos)
+                if SmoothnessAmount > 0 then
+                    Camera.CFrame = Camera.CFrame:Lerp(targetRotation, 1 - SmoothnessAmount)
+                else
+                    Camera.CFrame = targetRotation
+                end
+            end
+        end
     end
+    
+    -- Bhop Logic
+    if BhopEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        local humanoid = LocalPlayer.Character.Humanoid
+        if humanoid.MoveDirection.Magnitude > 0 then
+            if humanoid:GetState() == Enum.HumanoidStateType.Jumping or humanoid:GetState() == Enum.HumanoidStateType.Freefall then
+                LocalPlayer.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame + (humanoid.MoveDirection * BhopSpeed / 100)
+            end
+        end
+    end
+
+    -- Infinite Stamina Logic (Aggressive reset)
+    if InfiniteStaminaEnabled then
+        pcall(function()
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Stamina") then
+                LocalPlayer.Character.Stamina.Value = 100
+            end
+            if getrenv and getrenv()._G then
+                getrenv()._G.stamina = 100
+            end
+        end)
+    end
+    
+    -- Fix for Infinite Jump releasing (Continuous state check)
+    if InfJumpEnabled and UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+            LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+    
+    if FovEnabled then
+        FovCircle.Position = UserInputService:GetMouseLocation()
+        FovCircle.Color = GetMyTeamColor()
+        FovCircle.Visible = true
+    else FovCircle.Visible = false end
+
+    if TracersEnabled then UpdateTracers() end
 end)
 
 task.spawn(function()
     while task.wait(5) do
         if ChamsEnabled or NameEspEnabled or TracersEnabled then UpdateEsp() end
     end
-end)
-
-Players.PlayerAdded:Connect(function(player)
-    player.CharacterAdded:Connect(function()
-        task.wait(1)
-        if ChamsEnabled or NameEspEnabled or TracersEnabled then UpdateEsp() end
-    end)
-end)
-
-Players.PlayerRemoving:Connect(function()
-    if ChamsEnabled or NameEspEnabled or TracersEnabled then UpdateEsp() end
-end)
-
-LocalPlayer.CharacterAdded:Connect(function()
-    task.wait(1)
-    if ChamsEnabled or NameEspEnabled or TracersEnabled then UpdateEsp() end
 end)
 
 UpdateEsp()
