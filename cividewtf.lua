@@ -27,6 +27,7 @@ local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
 local AimlockEnabled = false
+local AimlockAlwaysOn = false
 local ArrestAuraEnabled = false
 local TeamCheckEnabled = true
 local ChamsEnabled = false
@@ -235,6 +236,7 @@ local MiscTab = Window:CreateTab("Misc", 4483362458)
 
 CombatTab:CreateSection("Aimlock")
 CombatTab:CreateToggle({Name = "Aimlock (Hold Right Mouse)", CurrentValue = false, Flag = "AimlockToggle", Callback = function(Value) AimlockEnabled = Value end})
+CombatTab:CreateToggle({Name = "Aimlock Always On (Mobile)", CurrentValue = false, Flag = "AimlockAlwaysOnToggle", Callback = function(Value) AimlockAlwaysOn = Value end})
 CombatTab:CreateToggle({Name = "Team Check", CurrentValue = true, Flag = "TeamCheckToggle", Callback = function(Value) TeamCheckEnabled = Value end})
 CombatTab:CreateToggle({Name = "Show FOV Circle", CurrentValue = false, Flag = "FovToggle", Callback = function(Value) FovEnabled = Value FovCircle.Visible = Value end})
 CombatTab:CreateSlider({Name = "FOV Size", Range = {50, 500}, Increment = 10, Suffix = "px", CurrentValue = 100, Flag = "FovSlider", Callback = function(Value) FovSize = Value FovCircle.Radius = Value end})
@@ -259,7 +261,7 @@ UserInputService.InputBegan:Connect(function(input) if input.UserInputType == En
 UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton2 then RightMouseDown = false end end)
 
 RunService.RenderStepped:Connect(function()
-    if AimlockEnabled and RightMouseDown then
+    if AimlockEnabled and (RightMouseDown or AimlockAlwaysOn) then
         CurrentTarget = GetClosestPlayerToCursor()
         if CurrentTarget and CurrentTarget.Character and CurrentTarget.Character:FindFirstChild("Head") then
             local head = CurrentTarget.Character.Head
